@@ -224,3 +224,27 @@ example (p q : Prop) : p → q → (p ∧ q) ∧ (p ∧ q ∧ p) := by
   anyGoals assumption
   split
   anyGoals assumption
+
+
+def Lean.Meta.exists (mvarId : MVarId) : MetaM (List MVarId) := do
+  withMVarContext mvarId do
+    checkNotAssigned mvarId `exists
+    let target ← getMVarType' mvarId
+    matchConstInduct target.getAppFn
+      (fun _ => throwTacticEx `split mvarId "target is not an inductive datatype")
+      fun ival us => do
+        match ival.ctors with
+        | [ctor] => apply mvarId (mkConst ctor us)
+        | _ => throwError "exists failed, goal must be an inductive type with only one constructor {indentExpr target}"
+
+elab "exists" : tactic => withMainContext do
+  let mvarIds' ← Meta.exists (← getMainGoal)
+  Term.synthesizeSyntheticMVarsNoPostponing
+  replaceMainGoal mvarIds'
+
+theorem a : ∃ i : Nat, i = 1 := by
+  apply Exists.intro 1
+
+  done
+
+#print a

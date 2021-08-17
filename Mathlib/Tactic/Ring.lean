@@ -16,17 +16,6 @@ Based on <http://www.cs.ru.nl/~freek/courses/tt-2014/read/10.1.1.61.3041.pdf> .
 
 open Lean Parser.Tactic Elab Command Elab.Tactic Meta
 
-open Expr in
-private def getAppFnAndArgsAux : Expr → Array Expr → Nat → Option (Name × Array Expr)
-  | app f a _,   as, i => getAppFnAndArgsAux f (as.set! i a) (i-1)
-  | const n _ _, as, i => some (n,as)
-  | _,           as, _ => none
-
-def Lean.Expr.getAppFnAndArgs (e : Expr) : Option (Name × Array Expr) :=
-  let dummy := mkSort levelZero
-  let nargs := e.getAppNumArgs
-  getAppFnAndArgsAux e (mkArray nargs dummy) (nargs-1)
-
 namespace Tactic
 namespace Ring
 
@@ -390,20 +379,20 @@ theorem subst_into_pow {α} [Monoid α] (l r tl tr t)
 by rw [prl, prr, prt]
 
 partial def eval (e : Expr) : RingM (HornerExpr × Expr) :=
-  match e.getAppFnAndArgs with
-  | some (``HAdd.hAdd, #[_,_,_,_,e₁,e₂]) => do
+  e.withApp fun
+  | Expr.const ``HAdd.hAdd _ _, #[_,_,_,_,e₁,e₂] => do
     let (e₁', p₁) ← eval e₁
     let (e₂', p₂) ← eval e₂
     let (e', p') ← evalAdd e₁' e₂'
     let p ← mkAppM ``subst_into_add #[e₁, e₂, e₁', e₂', e', p₁, p₂, p']
     (e',p)
-  | some (``HMul.hMul, #[_,_,_,_,e₁,e₂]) => do
+  | Expr.const ``HMul.hMul _ _, #[_,_,_,_,e₁,e₂] => do
     let (e₁', p₁) ← eval e₁
     let (e₂', p₂) ← eval e₂
     let (e', p') ← evalMul e₁' e₂'
     let p ← mkAppM ``subst_into_mul #[e₁, e₂, e₁', e₂', e', p₁, p₂, p']
     return (e', p)
-  | some (``HPow.hPow, #[_,_,_,P,e₁,e₂]) => do
+  | Expr.const ``HPow.hPow _ _, #[_,_,_,P,e₁,e₂] => do
     -- let (e₂', p₂) ← lift $ norm_num.derive e₂ <|> refl_conv e₂,
     let (e₂', p₂) ← (e₂, ← mkEqRefl e₂)
     match e₂'.numeral?, P.getAppFn with
@@ -414,7 +403,7 @@ partial def eval (e : Expr) : RingM (HornerExpr × Expr) :=
       return (e', p)
     | _, _ => do ← evalAtom e
     evalAtom e
-  | _ =>
+  | _, _ =>
     match e.numeral? with
     | some n => (const e n).reflConv
     | _ => (evalAtom e)
@@ -422,8 +411,8 @@ partial def eval (e : Expr) : RingM (HornerExpr × Expr) :=
 
 elab "ring" : tactic => do
   let g ← getMainTarget
-  match g.getAppFnAndArgs with
-  | some (`Eq, #[ty, e₁, e₂]) =>
+  g.withApp fun
+  | Expr.const ``Eq _ _, #[ty, e₁, e₂] => do
     let ((e₁', p₁), (e₂', p₂)) ← run e₁ $ Prod.mk <$> eval e₁ <*> eval e₂
     if (← isDefEq e₁' e₂') then
       let p ← mkEqTrans p₁ (← mkEqSymm p₂)
@@ -433,7 +422,7 @@ elab "ring" : tactic => do
       replaceMainGoal []
     else
       throwError "failed \n{← e₁'.pp}\n{← e₂'.pp}"
-  | _ => throwError "failed: not an equality"
+  | _, _ => throwError "failed: not an equality"
 
 example (x y : ℕ) : x + y = y + x := by ring
 example (x y : ℕ) : x + y + y = 2 * y + x := by ring

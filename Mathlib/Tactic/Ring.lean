@@ -23,6 +23,7 @@ namespace Ring
 structure Cache :=
   α : Expr
   univ : Level
+  crα : Expr
 
 structure State :=
   atoms : Array Expr := #[]
@@ -33,8 +34,9 @@ the list of atoms-up-to-defeq encountered thus far, used for atom sorting. -/
 abbrev RingM := ReaderT Cache $ StateRefT State MetaM
 
 def RingM.run (ty : Expr) (m : RingM α) : MetaM α := do
-  let u ← getLevel ty
-  (m {α := ty, univ := u}).run' {}
+  let Level.succ u _ ← getLevel ty | throwError "fail"
+  let inst ← synthInstance (mkApp (mkConst ``CommSemiring [u]) ty)
+  (m {α := ty, univ := u, crα := inst }).run' {}
 
 /-- Get the index corresponding to an atomic expression, if it has already been encountered, or
 put it in the list of atoms and return the new index, otherwise. -/

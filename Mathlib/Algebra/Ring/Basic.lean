@@ -28,7 +28,7 @@ variable {R} [Semiring R]
 instance : MonoidWithZero R where
   __ := ‹Semiring R›
 
-theorem mul_add  (a b c : R) : a * (b + c) = a * b + a * c := Semiring.mul_add a b c
+theorem mul_add (a b c : R) : a * (b + c) = a * b + a * c := Semiring.mul_add a b c
 
 theorem add_mul {R} [Semiring R] (a b c : R) : (a + b) * c = a * c + b * c := Semiring.add_mul a b c
 
@@ -60,10 +60,21 @@ class Ring (R : Type u) extends Monoid R, AddCommGroup R, Numeric R where
   ofNat_one : ofNat (nat_lit 1) = One.one
   ofNat_zero : ofNat (nat_lit 0) = Zero.zero
 
+section Ring_lemmas
+variable {R : Type u} [Ring R]
+
 instance (R : Type u) [Ring R] : Semiring R where
   zero_mul := λ a => by rw [← add_right_eq_self (a := 0 * a), ← Ring.add_mul, zero_add]
   mul_zero := λ a => by rw [← add_right_eq_self (a := a * 0), ← Ring.mul_add]; simp
   __ := ‹Ring R›
+
+lemma neg_mul_eq_neg_mul (a b : R) : -(a * b) = -a * b :=
+neg_eq_of_add_eq_zero $ by rw [← add_mul, add_right_neg, zero_mul b]
+
+lemma neg_mul_eq_mul_neg (a b : R) : -(a * b) = a * -b :=
+neg_eq_of_add_eq_zero $ by rw [← mul_add, add_right_neg, mul_zero a]
+
+end Ring_lemmas
 
 class CommRing (R : Type u) extends Ring R where
   mul_comm (a b : R) : a * b = b * a

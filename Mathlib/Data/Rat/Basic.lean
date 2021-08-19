@@ -68,6 +68,16 @@ def ofInt (n : ℤ) : ℚ :=
 
 instance (n : ℕ) : OfNat ℚ n := ⟨ofInt n⟩
 
+open Int Nat in
+theorem neg_div : ∀ {a b : ℤ}, -a / b = -(a / b)
+| ofNat 0,   ofNat m         => show ofNat (0/m) = -(ofNat (0/m)) by simp
+| ofNat (succ m),   ofNat n   => by rfl
+| ofNat 0,   negSucc m         => show - ofNat (0/succ m) = - -(ofNat (0/succ m)) by simp
+| ofNat (succ m),   negSucc n =>
+  show ofNat (succ m / succ n) = -(-ofNat (succ m / succ n)) by simp [Int.neg_neg]
+| negSucc m, ofNat n   => show ofNat (succ m /n) = -(-ofNat (succ m / n)) by simp [Int.neg_neg]
+| negSucc m, negSucc n => by rfl
+
 /-- Form the quotient `n / d` where `n:ℤ` and `d:ℕ+` (not necessarily coprime) -/
 def mkPnat (n : ℤ) (d : ℕ) (dpos : 0 < d): ℚ :=
 let n' := n.natAbs
@@ -83,8 +93,10 @@ let cop : (n/g).nat_abs.coprime denom := by
     cases Int.nat_abs_eq n with
     | inl e =>
       rw [e]
-      exact rfl
-    | inr e' => admit
+      rfl
+    | inr e =>
+      rw [e, neg_div, Int.nat_abs_neg]
+      rfl
   rw [h]
   exact Nat.coprime_div_gcd_div_gcd (Nat.gcd_pos_of_pos_right _ dpos)
 return ⟨num, denom, pos, cop⟩
@@ -94,10 +106,34 @@ return ⟨num, denom, pos, cop⟩
 def mkNat (n : ℤ) (d : ℕ) : ℚ :=
 if d0 : d = 0 then 0 else mkPnat n d $ Nat.pos_of_ne_zero d0
 
-
 /-- Form the quotient `n / d` where `n d : ℤ`. -/
 def mk : ℤ → ℤ → ℚ
 | n, (d : ℕ) => mkNat n d
 | n ,-[1+ d] => mkNat (-n) (d.succ)
 
+local infix:70 " /. " => Rat.mk
+
+
+theorem mkNat_eq (n d) : mkNat n d = n /. d := rfl
+
+@[simp] theorem mk_zero (n) : n /. 0 = 0 := rfl
+
+@[simp] theorem zero_mk_pnat (d : ℕ) (dpos : 0 < d) : mkPnat 0 d dpos = 0 :=
+by
+  simp [mkPnat]; simp [*]; rfl
+
+@[simp] theorem zero_mk_nat (n) : mkNat 0 n = 0 :=
+by
+  by_cases n = 0
+  simp [mkNat, h]
+  simp [mkNat, h]
+
+@[simp] theorem zero_mk (n) : 0 /. n = 0 :=
+by
+  cases n with
+  | ofNat x =>
+    simp [mk]
+  | negSucc x =>
+    simp [mk]
+    cc
 end Rat

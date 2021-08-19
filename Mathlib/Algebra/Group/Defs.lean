@@ -242,6 +242,9 @@ theorem add_neg_self (a : A) : a + -a = 0 := add_right_neg a
 @[simp] theorem add_neg_cancel_right (a b : A) : a + b + -b = a :=
 by rw [add_assoc, add_right_neg, add_zero]
 
+@[simp] theorem neg_add_rev (a b : A) : -(a + b) = -b + -a :=
+neg_eq_of_add_eq_zero $ by simp [← add_assoc]
+
 instance (A : Type u) [AddGroup A] : IsAddRightCancel A where
   add_right_cancel a b c h := by
   rw [← add_neg_cancel_right b a, h, add_neg_cancel_right]

@@ -29,9 +29,10 @@ partial def Expr.numeral? (e : Expr) : Option Nat :=
 
 namespace Meta
 
-def mkOfNatLit (u : Level) (α sα n : Expr) : Expr :=
-  let inst := mkApp3 (mkConst ``Numeric.OfNat [u]) α n sα
-  mkApp3 (mkConst ``OfNat.ofNat [u]) α n inst
+def mkOfNatLit (u : Level) (α sα n : Expr) : MetaM Expr :=
+  -- let inst := mkApp3 (mkConst ``Numeric.OfNat [u]) α n sα
+  -- mkApp3 (mkConst ``OfNat.ofNat [u]) α n inst
+  mkNumeral α n.natLit!
 
 namespace NormNum
 
@@ -50,59 +51,45 @@ theorem ofNat_pow {α} [Semiring α] : (a : α) → (n a' c : Nat) →
   a = OfNat.ofNat a' → a'^n = c → a ^ n = OfNat.ofNat c
 | _, _, _, _, rfl, rfl => (Semiring.ofNat_pow _ _).symm
 
-partial def eval' (e : Expr) : MetaM (Expr × Expr) := do
+partial def eval' (e : Expr) : MetaM (Expr × Expr × ℕ) := do
   match e.getAppFnArgs with
   | (``HAdd.hAdd, #[_, _, α, _, a, b]) => evalBinOp ``NormNum.ofNat_add (·+·) α a b
   | (``HMul.hMul, #[_, _, α, _, a, b]) => evalBinOp ``NormNum.ofNat_mul (·*·) α a b
   | (``HPow.hPow, #[_, _, α, _, a, n]) => evalPow ``NormNum.ofNat_pow (·^·) α a n
   | (``OfNat.ofNat, #[α, ln, _]) =>
     match ← ln.natLit? with
-    | some 0 =>
-      let Level.succ u _ ← getLevel α | throwError "fail"
-      let nα ← synthInstance (mkApp (mkConst ``Numeric [u]) α)
-      let sα ← synthInstance (mkApp (mkConst ``Semiring [u]) α)
-      let e ← mkOfNatLit u α nα (mkRawNatLit 0)
-      let p ← mkEqSymm (mkApp2 (mkConst ``Semiring.ofNat_zero [u]) α sα)
-      (e, p)
-    | some 1 =>
-      let Level.succ u _ ← getLevel α | throwError "fail"
-      let nα ← synthInstance (mkApp (mkConst ``Numeric [u]) α)
-      let sα ← synthInstance (mkApp (mkConst ``Semiring [u]) α)
-      let e ← mkOfNatLit u α nα (mkRawNatLit 1)
-      let p ← mkEqSymm (mkApp2 (mkConst ``Semiring.ofNat_one [u]) α sα)
-      (e, p)
-    | some _ => pure (e, ← mkEqRefl e)
+    | some n => pure (e, ← mkEqRefl e, n)
     | none => throwError "fail"
   | _ =>
-    if e.isNatLit then
-      (mkOfNatLit levelZero (mkConst ``Nat) (mkConst ``Nat.instNumericNat) e,
-       mkApp (mkConst ``ofNat_nat) e)
+    if let some n ← e.natLit? then
+      (← mkOfNatLit levelZero (mkConst ``Nat) (mkConst ``Nat.instNumericNat) e,
+       mkApp (mkConst ``ofNat_nat) e, n)
     else throwError "fail"
 where
-  evalBinOp (name : Name) (f : Nat → Nat → Nat) (α a b : Expr) : MetaM (Expr × Expr) := do
+  evalBinOp (name : Name) (f : Nat → Nat → Nat) (α a b : Expr) : MetaM (Expr × Expr × ℕ) := do
     let Level.succ u _ ← getLevel α | throwError "fail"
     let nα ← synthInstance (mkApp (mkConst ``Numeric [u]) α)
     let sα ← synthInstance (mkApp (mkConst ``Semiring [u]) α)
-    let (a', pa) ← eval' a
-    let (b', pb) ← eval' b
+    let (a', pa, na) ← eval' a
+    let (b', pb, nb) ← eval' b
     let la := Expr.getRevArg! a' 1
     let lb := Expr.getRevArg! b' 1
     let lc := mkRawNatLit (f la.natLit! lb.natLit!)
-    let c := mkOfNatLit u α nα lc
-    (c, mkApp10 (mkConst name [u]) α sα a b la lb lc pa pb (← mkEqRefl lc))
-  evalPow (name : Name) (f : Nat → Nat → Nat) (α a n : Expr) : MetaM (Expr × Expr) := do
+    let c ← mkOfNatLit u α nα lc
+    (c, mkApp10 (mkConst name [u]) α sα a b la lb lc pa pb (← mkEqRefl lc), f la.natLit! lb.natLit!)
+  evalPow (name : Name) (f : Nat → Nat → Nat) (α a n : Expr) : MetaM (Expr × Expr × ℕ) := do
     let Level.succ u _ ← getLevel α | throwError "fail"
     let nα ← synthInstance (mkApp (mkConst ``Numeric [u]) α)
     let sα ← synthInstance (mkApp (mkConst ``Semiring [u]) α)
-    let (a', pa) ← eval' a
+    let (a', pa, na) ← eval' a
     let la := Expr.getRevArg! a' 1
     let some nn ← n.numeral? | throwError "fail"
     let lc := mkRawNatLit (f la.natLit! nn)
-    let c := mkOfNatLit u α nα lc
-    (c, mkApp8 (mkConst name [u]) α sα a n la lc pa (← mkEqRefl lc))
+    let c ← mkOfNatLit u α nα lc
+    (c, mkApp8 (mkConst name [u]) α sα a n la lc pa (← mkEqRefl lc), f la.natLit! nn)
 
 def eval (e : Expr) : MetaM (Expr × Expr) := do
-  let (e', p) ← eval' e
+  let (e', p, n) ← eval' e
   e'.withApp fun f args => do
     if f.isConstOf ``OfNat.ofNat then
       let #[α,ln,_] ← args | throwError "fail"
@@ -134,8 +121,8 @@ open Meta Elab Tactic
 @[tactic normNum] def Tactic.eval'NormNum : Tactic := fun stx =>
   liftMetaTactic fun g => do
     let some (α, lhs, rhs) ← matchEq? (← getMVarType g) | throwError "fail"
-    let (lhs₂, lp) ← NormNum.eval' lhs
-    let (rhs₂, rp) ← NormNum.eval' rhs
+    let (lhs₂, lp, ln) ← NormNum.eval' lhs
+    let (rhs₂, rp, rn) ← NormNum.eval' rhs
     unless ← isDefEq lhs₂ rhs₂ do throwError "fail"
     let p ← mkEqTrans lp (← mkEqSymm rp)
     assignExprMVar g p
@@ -143,6 +130,7 @@ open Meta Elab Tactic
 
 end Lean
 
+-- set_option pp.all true
 variable (α) [Semiring α]
 example : (1 + 0 : α) = (0 + 1 : α) := by normNum
 example : (0 + (2 + 3) + 1 : α) = 6 := by normNum

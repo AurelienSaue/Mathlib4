@@ -120,8 +120,8 @@ instance : CommRing ℤ where
   mul_comm := Int.mul_comm
   mul_add := Int.distrib_left
   add_mul := Int.distrib_right
-  ofNat_add := by simp [of_nat_add]
-  ofNat_mul := by simp [of_nat_mul]
+  ofNat_add := by simp [ofNat_add]
+  ofNat_mul := by simp [ofNat_mul]
   ofNat_one := rfl
   ofNat_zero := rfl
   mul_one := Int.mul_one
@@ -143,18 +143,18 @@ instance : CommRing ℤ where
   nsmul_zero' := Int.zero_mul
   nsmul_succ' n x := by
     show ofNat (Nat.succ n) * x = x + ofNat n * x
-    rw [Int.of_nat_succ, Int.distrib_right, Int.add_comm, Int.one_mul]
+    rw [Int.ofNat_succ, Int.distrib_right, Int.add_comm, Int.one_mul]
   sub_eq_add_neg a b := Int.sub_eq_add_neg
   gsmul := HMul.hMul
   gsmul_zero' := Int.zero_mul
-  gsmul_succ' n x := by rw [Int.of_nat_succ, Int.distrib_right, Int.add_comm, Int.one_mul]
+  gsmul_succ' n x := by rw [Int.ofNat_succ, Int.distrib_right, Int.add_comm, Int.one_mul]
   gsmul_neg' n x := by
     cases x with
     | ofNat m =>
-      rw [Int.neg_succ_of_nat_of_nat, Int.of_nat_mul_of_nat]
+      rw [Int.negSucc_ofNat_ofNat, Int.ofNat_mul_ofNat]
       exact rfl
     | negSucc m =>
-      rw [Int.mul_neg_succ_of_nat_neg_succ_of_nat, Int.of_nat_mul_neg_succ_of_nat]
+      rw [Int.mul_negSucc_ofNat_negSucc_ofNat, Int.ofNat_mul_negSucc_ofNat]
       exact rfl
 
 end Int
